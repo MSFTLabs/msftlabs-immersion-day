@@ -116,6 +116,37 @@ resource "azurerm_windows_virtual_machine" "session_hosts" {
   ]
 }
 
+// https://opentofu.org/docs/language/resources/tf-data/
+// Replacing a host VM leaves its old session-host record in the pool, and the new agent then fails with NAME_ALREADY_REGISTERED.
+// The record is deleted on destroy, which runs after the extensions are removed and before the old VM is replaced.
+resource "terraform_data" "session_host_record" {
+  for_each = local.session_hosts
+
+  triggers_replace = azurerm_windows_virtual_machine.session_hosts[each.key].virtual_machine_id
+
+  input = {
+    script_path = abspath("${path.module}/scripts/Remove-AvdSessionHostRecord.ps1")
+    interpreter = local.avd_record_cleanup_interpreter
+    settings = {
+      subscription_id = var.subscription_id
+      resource_group  = azurerm_resource_group.shared.name
+      host_pool       = azurerm_virtual_desktop_host_pool.lab.name
+      host_name       = each.key
+      api_version     = local.avd_session_host_api_version
+    }
+  }
+
+  provisioner "local-exec" {
+    when        = destroy
+    command     = "& $env:LAB_AVD_RECORD_SCRIPT"
+    interpreter = self.input.interpreter
+    environment = {
+      LAB_AVD_RECORD_SCRIPT   = self.input.script_path
+      LAB_AVD_RECORD_SETTINGS = jsonencode(self.input.settings)
+    }
+  }
+}
+
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/virtual_machine_extension
 resource "azurerm_virtual_machine_extension" "entra_join" {
   for_each = local.session_hosts
@@ -129,6 +160,8 @@ resource "azurerm_virtual_machine_extension" "entra_join" {
   automatic_upgrade_enabled  = local.avd_extensions.entra_join.automatic_upgrade_enabled
   settings                   = jsonencode(local.avd_extensions.entra_join.settings)
   tags                       = local.tags
+
+  depends_on = [terraform_data.session_host_record]
 }
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/virtual_machine_extension

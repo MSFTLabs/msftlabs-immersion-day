@@ -58,27 +58,12 @@ Write-Output "VS Code terminal font: $terminalFont"
 
 $wallpaper = Join-Path $env:SystemRoot 'Web\Wallpaper\MsftLabs\host_bg.png'
 if (-not (Test-Path -LiteralPath $wallpaper)) { throw "The lab wallpaper is missing: $wallpaper" }
-& reg.exe load 'HKU\LabDefaultTest' 'C:\Users\Default\NTUSER.DAT' | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not load the Default user hive (exit code $LASTEXITCODE)." }
-try {
-    $personalize = Get-ItemProperty -LiteralPath 'Registry::HKEY_USERS\LabDefaultTest\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-    $desktop = Get-ItemProperty -LiteralPath 'Registry::HKEY_USERS\LabDefaultTest\Control Panel\Desktop'
-    if ($personalize.AppsUseLightTheme -ne 0 -or $personalize.SystemUsesLightTheme -ne 0) { throw 'Dark mode is not the default for new users.' }
-    if ($desktop.Wallpaper -ne $wallpaper) { throw "Unexpected default wallpaper: $($desktop.Wallpaper)" }
-    Write-Output "Default user: dark mode on, wallpaper $($desktop.Wallpaper)"
-    Remove-Variable personalize, desktop
-}
-finally {
-    [GC]::Collect()
-    [GC]::WaitForPendingFinalizers()
-    $unloaded = $false
-    foreach ($attempt in 1..10) {
-        & reg.exe unload 'HKU\LabDefaultTest' | Out-Null
-        if ($LASTEXITCODE -eq 0) { $unloaded = $true; break }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $unloaded) { throw 'Could not unload the Default user hive; Sysprep would fail.' }
-}
+$policyFile = Join-Path $env:SystemRoot 'System32\GroupPolicy\User\Registry.pol'
+if (-not (Test-Path -LiteralPath $policyFile)) { throw "The user policy file is missing: $policyFile" }
+$policyText = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($policyFile))
+if ($policyText -notmatch [regex]::Escape($wallpaper)) { throw "Registry.pol does not point to $wallpaper" }
+if ((Get-Content -LiteralPath (Join-Path $env:SystemRoot 'System32\GroupPolicy\gpt.ini') -Raw) -notmatch 'gPCUserExtensionNames') { throw 'gpt.ini does not register the user policy extension.' }
+Write-Output "Wallpaper policy: $wallpaper"
 
 if (-not (Test-Path -LiteralPath 'C:\labs\LabGuideExample.md')) { throw 'C:\labs\LabGuideExample.md was not uploaded.' }
 Write-Output "Labs: $((Get-ChildItem -LiteralPath C:\labs -Recurse -File).Count) files under C:\labs"

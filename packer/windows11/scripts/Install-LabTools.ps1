@@ -122,7 +122,7 @@ New-Item -ItemType Directory -Path $vscodeSettingsDirectory -Force | Out-Null
 $vscodeSettings = @{ 'terminal.integrated.fontFamily' = "'$fontFace'" } | ConvertTo-Json
 [IO.File]::WriteAllText((Join-Path $vscodeSettingsDirectory 'settings.json'), $vscodeSettings, [Text.UTF8Encoding]::new($false))
 
-## Dark mode and the lab wallpaper for new users: edit the Default user hive, which Windows uses as the template for each new profile.
+## Lab wallpaper through local user Group Policy, the method Microsoft's FederalAVD example uses; values copied from the Default hive were overwritten at first sign-in (checked on a rebuilt host).
 $wallpaperDirectory = Join-Path $env:SystemRoot 'Web\Wallpaper\MsftLabs'
 New-Item -ItemType Directory -Path $wallpaperDirectory -Force | Out-Null
 $wallpaper = Join-Path $wallpaperDirectory 'host_bg.png'
@@ -130,34 +130,43 @@ if (-not (Test-Path -LiteralPath 'C:\Windows\Temp\host_bg.png')) { throw 'host_b
 Copy-Item -LiteralPath 'C:\Windows\Temp\host_bg.png' -Destination $wallpaper -Force
 Remove-Item -LiteralPath 'C:\Windows\Temp\host_bg.png' -Force
 
-& reg.exe load 'HKU\LabDefault' 'C:\Users\Default\NTUSER.DAT' | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not load the Default user hive (exit code $LASTEXITCODE)." }
-try {
-    $personalize = 'HKU\LabDefault\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-    $desktop = 'HKU\LabDefault\Control Panel\Desktop'
-    $settings = @(
-        @{ Key = $personalize; Name = 'AppsUseLightTheme'; Type = 'REG_DWORD'; Value = '0' }
-        @{ Key = $personalize; Name = 'SystemUsesLightTheme'; Type = 'REG_DWORD'; Value = '0' }
-        @{ Key = $desktop; Name = 'Wallpaper'; Type = 'REG_SZ'; Value = $wallpaper }
-        @{ Key = $desktop; Name = 'WallpaperStyle'; Type = 'REG_SZ'; Value = '10' }
-        @{ Key = $desktop; Name = 'TileWallpaper'; Type = 'REG_SZ'; Value = '0' }
-    )
-    foreach ($setting in $settings) {
-        & reg.exe add $setting.Key /v $setting.Name /t $setting.Type /d $setting.Value /f | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "reg add failed for $($setting.Name) (exit code $LASTEXITCODE)." }
-    }
+$policyDirectory = Join-Path $env:SystemRoot 'System32\GroupPolicy'
+$policyFile = Join-Path $policyDirectory 'User\Registry.pol'
+$gptFile = Join-Path $policyDirectory 'gpt.ini'
+if ((Test-Path -LiteralPath $policyFile) -or (Test-Path -LiteralPath $gptFile)) { throw "Local Group Policy already exists in $policyDirectory; merge instead of overwriting." }
+
+# MS-GPREG Registry.pol: 'PReg' + version 1, then [key;value;type;size;data] entries in UTF-16LE.
+$policyKey = 'Software\Microsoft\Windows\CurrentVersion\Policies\System'
+$policyValues = @(
+    @{ Name = 'Wallpaper'; Data = $wallpaper }
+    @{ Name = 'WallpaperStyle'; Data = '10' }
+)
+$stream = [IO.MemoryStream]::new()
+$writer = [IO.BinaryWriter]::new($stream)
+$writer.Write([Text.Encoding]::ASCII.GetBytes('PReg'))
+$writer.Write([uint32]1)
+foreach ($value in $policyValues) {
+    $data = [Text.Encoding]::Unicode.GetBytes($value.Data + [char]0)
+    $writer.Write([byte[]](0x5B, 0x00))
+    $writer.Write([Text.Encoding]::Unicode.GetBytes($policyKey + [char]0))
+    $writer.Write([byte[]](0x3B, 0x00))
+    $writer.Write([Text.Encoding]::Unicode.GetBytes($value.Name + [char]0))
+    $writer.Write([byte[]](0x3B, 0x00))
+    $writer.Write([uint32]1)
+    $writer.Write([byte[]](0x3B, 0x00))
+    $writer.Write([uint32]$data.Length)
+    $writer.Write([byte[]](0x3B, 0x00))
+    $writer.Write($data)
+    $writer.Write([byte[]](0x5D, 0x00))
 }
-finally {
-    # Release PowerShell's handles so the hive can unload.
-    [GC]::Collect()
-    [GC]::WaitForPendingFinalizers()
-    $unloaded = $false
-    foreach ($attempt in 1..10) {
-        & reg.exe unload 'HKU\LabDefault' | Out-Null
-        if ($LASTEXITCODE -eq 0) { $unloaded = $true; break }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $unloaded) { throw 'Could not unload the Default user hive; Sysprep would fail.' }
-}
+$writer.Flush()
+New-Item -ItemType Directory -Path (Split-Path $policyFile) -Force | Out-Null
+[IO.File]::WriteAllBytes($policyFile, $stream.ToArray())
+$writer.Dispose()
+$stream.Dispose()
+
+# User policy version 1 (high word) and the Registry CSE with its user tool extension GUID, as FederalAVD writes them.
+$gpt = "[General]`r`ngPCUserExtensionNames=[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{D02B1F73-3407-48AE-BA88-E8213C6761F1}]`r`nVersion=65536`r`n"
+[IO.File]::WriteAllText($gptFile, $gpt, [Text.Encoding]::ASCII)
 
 Write-Output 'Tool installs completed.'

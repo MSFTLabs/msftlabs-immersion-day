@@ -2,12 +2,22 @@
 
 A new Packer image build starts when this file changes on `main`. The build publishes the version in the first `## [x.y.z]` heading to the Azure Compute Gallery, and skips the build when that version already exists. Add a new heading at the top for every image change, and follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] - 2026-10-29
+
+### Changed
+
+- The lab wallpaper (`host_bg.png`, copied to `C:\Windows\Web\Wallpaper\MsftLabs`) is set through local user Group Policy (`Registry.pol` and `gpt.ini`) instead of the Default user hive, whose values were overwritten at first sign-in on 1.0.2.
+
+### Removed
+
+- The Default user hive edits for the wallpaper and dark mode. Dark mode is not set by the image.
+
 ## [1.0.2] - 2026-10-29
 
 ### Changed
 
 - Markdone (pinned zip, SHA256-checked, installed to `C:\Program Files\Markdone`) replaces MarkView; `C:\labs\LabGuideExample.md` opens in it at every user logon.
-- Dark mode and the lab wallpaper (`host_bg.png`, copied to `C:\Windows\Web\Wallpaper\MsftLabs`) are the defaults for new users, set in the Default user hive.
+- Dark mode and the lab wallpaper were set in the Default user hive (superseded in 1.0.3; new users did not get either).
 
 ### Fixed
 
