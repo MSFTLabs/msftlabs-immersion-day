@@ -73,6 +73,11 @@ resource "azurerm_public_ip" "bastion" {
   allocation_method   = local.public_ip_allocation_method
   sku                 = local.public_ip_sku
   tags                = local.tags
+
+  # ip_tags is added after creation by an external principal and forces replacement.
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/bastion_host
@@ -99,6 +104,11 @@ resource "azurerm_public_ip" "egress" {
   allocation_method   = local.public_ip_allocation_method
   sku                 = local.public_ip_sku
   tags                = local.tags
+
+  # ip_tags is added after creation by an external principal and forces replacement.
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/nat_gateway

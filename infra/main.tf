@@ -31,6 +31,7 @@ resource "azurerm_storage_account" "boot_diagnostics" {
   min_tls_version                 = local.boot_diagnostics_min_tls_version
   allow_nested_items_to_be_public = local.boot_diagnostics_public_blobs
   shared_access_key_enabled       = local.boot_diagnostics_shared_key_enabled
+  local_user_enabled              = local.boot_diagnostics_local_user_enabled
   public_network_access           = local.monitoring_public_network_access
   tags                            = local.tags
 }

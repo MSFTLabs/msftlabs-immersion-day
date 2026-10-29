@@ -79,7 +79,7 @@ avd_config = {
 }
 
 avd_session_host_count      = 2
-avd_image_version           = "1.0.0"
+avd_image_version           = "1.0.1"
 avd_admin_password          = null
 avd_registration_expiration = "2026-11-05T02:33:26Z"
 

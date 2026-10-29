@@ -20,10 +20,10 @@ $ohMyPosh = @{
     Sha256 = 'C2B34D2E8D9DB243172170CE4ADB70B0BD1476D29D355BC783CFA886724EB27E'
 }
 
-## MarkView is not in Chocolatey; the vendor MSI (ALLUSERS=1) is pinned by version and SHA256.
-$markView = @{
-    Url    = 'https://markview.io/releases/v0.3.30/MarkView_0.3.30_x64_en-US.msi'
-    Sha256 = 'F3BD9D45185B337E2EA74FD2775501AC7205F529A5FD7B8C80C50CFCCB44D440'
+## Markdone is not in Chocolatey and ships as an unsigned zip with one self-contained exe, so pin the stable release by SHA256.
+$markdone = @{
+    Url    = 'https://apps.tomlabs.cz/dl/Markdone/stable/0.6.2/Markdone-win-x64.zip'
+    Sha256 = 'B6209ECAA81B419EB02BB83DD5B5B63FD29461F267EF6D00BC53E15332D0C12B'
 }
 
 $terminalPowerShellProfileGuid = '{574e775e-4f2a-5b96-ac1e-a2962a402336}'
@@ -52,20 +52,20 @@ foreach ($package in $packages) {
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
 [Environment]::SetEnvironmentVariable('AZURE_BICEP_USE_BINARY_FROM_PATH', 'True', 'Machine')
 
-## MarkView
-$msi = Join-Path $env:TEMP 'MarkView.msi'
-Invoke-WebRequest -Uri $markView.Url -OutFile $msi -UseBasicParsing
-$hash = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash
-if ($hash -ne $markView.Sha256) { throw "MarkView MSI hash mismatch: expected $($markView.Sha256), got $hash." }
-if ((Get-AuthenticodeSignature -LiteralPath $msi).Status -ne 'Valid') { throw 'MarkView MSI signature is not valid.' }
-$process = Start-Process -FilePath msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', 'ALLUSERS=1', '/l*v', "`"$env:TEMP\MarkView.msi.log`"") -Wait -PassThru
-if ($process.ExitCode -notin @(0, 3010)) { throw "MarkView MSI install failed with exit code $($process.ExitCode); see $env:TEMP\MarkView.msi.log." }
-Remove-Item -LiteralPath $msi -Force
+## Markdone
+$zip = Join-Path $env:TEMP 'Markdone.zip'
+Invoke-WebRequest -Uri $markdone.Url -OutFile $zip -UseBasicParsing
+$hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
+if ($hash -ne $markdone.Sha256) { throw "Markdone zip hash mismatch: expected $($markdone.Sha256), got $hash." }
+$markdoneDirectory = Join-Path $env:ProgramFiles 'Markdone'
+New-Item -ItemType Directory -Path $markdoneDirectory -Force | Out-Null
+Expand-Archive -LiteralPath $zip -DestinationPath $markdoneDirectory -Force
+Remove-Item -LiteralPath $zip -Force
 
-## Open the lab guide in MarkView at every logon; the MSI installs to Program Files\MarkView (INSTALLDIR in the MSI Directory table).
-$markViewExe = Join-Path $env:ProgramFiles 'MarkView\markview.exe'
-if (-not (Test-Path -LiteralPath $markViewExe)) { throw "MarkView was not found at $markViewExe." }
-$logonCommand = "`"$markViewExe`" `"C:\labs\LabGuideExample.md`""
+## Open the lab guide in Markdone at every logon.
+$markdoneExe = Join-Path $markdoneDirectory 'Markdone.exe'
+if (-not (Test-Path -LiteralPath $markdoneExe)) { throw "Markdone was not found at $markdoneExe." }
+$logonCommand = "`"$markdoneExe`" `"C:\labs\LabGuideExample.md`""
 # The Run key limits the command line to 260 characters.
 if ($logonCommand.Length -gt 260) { throw 'The logon command exceeds the 260 character Run key limit.' }
 Set-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'MsftLabsGuide' -Value $logonCommand
@@ -115,5 +115,49 @@ $fragmentDirectory = Join-Path $env:ProgramData 'Microsoft\Windows Terminal\Frag
 New-Item -ItemType Directory -Path $fragmentDirectory -Force | Out-Null
 $fragment = @{ profiles = @(@{ updates = $terminalPowerShellProfileGuid; font = @{ face = $fontFace } }) } | ConvertTo-Json -Depth 6
 [IO.File]::WriteAllText((Join-Path $fragmentDirectory 'lab.json'), $fragment, [Text.UTF8Encoding]::new($false))
+
+## VS Code has no machine-wide settings file; the Default profile is copied into each new user profile at first sign-in.
+$vscodeSettingsDirectory = Join-Path $env:SystemDrive 'Users\Default\AppData\Roaming\Code\User'
+New-Item -ItemType Directory -Path $vscodeSettingsDirectory -Force | Out-Null
+$vscodeSettings = @{ 'terminal.integrated.fontFamily' = "'$fontFace'" } | ConvertTo-Json
+[IO.File]::WriteAllText((Join-Path $vscodeSettingsDirectory 'settings.json'), $vscodeSettings, [Text.UTF8Encoding]::new($false))
+
+## Dark mode and the lab wallpaper for new users: edit the Default user hive, which Windows uses as the template for each new profile.
+$wallpaperDirectory = Join-Path $env:SystemRoot 'Web\Wallpaper\MsftLabs'
+New-Item -ItemType Directory -Path $wallpaperDirectory -Force | Out-Null
+$wallpaper = Join-Path $wallpaperDirectory 'host_bg.png'
+if (-not (Test-Path -LiteralPath 'C:\Windows\Temp\host_bg.png')) { throw 'host_bg.png was not uploaded to C:\Windows\Temp.' }
+Copy-Item -LiteralPath 'C:\Windows\Temp\host_bg.png' -Destination $wallpaper -Force
+Remove-Item -LiteralPath 'C:\Windows\Temp\host_bg.png' -Force
+
+& reg.exe load 'HKU\LabDefault' 'C:\Users\Default\NTUSER.DAT' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Could not load the Default user hive (exit code $LASTEXITCODE)." }
+try {
+    $personalize = 'HKU\LabDefault\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    $desktop = 'HKU\LabDefault\Control Panel\Desktop'
+    $settings = @(
+        @($personalize, 'AppsUseLightTheme', 'REG_DWORD', '0')
+        @($personalize, 'SystemUsesLightTheme', 'REG_DWORD', '0')
+        @($desktop, 'Wallpaper', 'REG_SZ', $wallpaper)
+        @($desktop, 'WallpaperStyle', 'REG_SZ', '10')
+        @($desktop, 'TileWallpaper', 'REG_SZ', '0')
+    )
+    foreach ($setting in $settings) {
+        & reg.exe add $setting[0] /v $setting[1] /t $setting[2] /d $setting[3] /f | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "reg add failed for $($setting[1]) (exit code $LASTEXITCODE)." }
+    }
+}
+finally {
+    # Release PowerShell's handles so the hive can unload.
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+    $unloaded = $false
+    foreach ($attempt in 1..10) {
+        & reg.exe unload 'HKU\LabDefault' | Out-Null
+        if ($LASTEXITCODE -eq 0) { $unloaded = $true; break }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $unloaded) { throw 'Could not unload the Default user hive; Sysprep would fail.' }
+}
 
 Write-Output 'Tool installs completed.'

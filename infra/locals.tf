@@ -19,7 +19,8 @@ locals {
   boot_diagnostics_https_only                    = true
   boot_diagnostics_min_tls_version               = "TLS1_2"
   boot_diagnostics_public_blobs                  = false
-  boot_diagnostics_shared_key_enabled            = true
+  boot_diagnostics_shared_key_enabled            = false
+  boot_diagnostics_local_user_enabled            = false
   monitoring_public_network_access               = "Enabled"
   monitoring_workspace_sku                       = "PerGB2018"
   monitoring_workspace_local_authentication      = false

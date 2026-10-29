@@ -150,6 +150,12 @@ build {
   name    = "msftlabs-windows11"
   sources = ["source.azure-arm.windows11"]
 
+  # Staged here and moved into Windows\Web\Wallpaper by Install-LabTools (the file provisioner needs a writable destination).
+  provisioner "file" {
+    source      = "${path.root}/scripts/host_bg.png"
+    destination = "C:/Windows/Temp/host_bg.png"
+  }
+
   provisioner "powershell" {
     script  = "${path.root}/scripts/Install-LabTools.ps1"
     timeout = "45m"
