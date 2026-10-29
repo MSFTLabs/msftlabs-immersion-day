@@ -12,8 +12,13 @@ $packages = @(
     @{ Id = 'git' }
     @{ Id = 'vscode' }
     @{ Id = 'bicep' }
-    @{ Id = 'oh-my-posh' }
 )
+
+## Oh My Posh: the Chocolatey package is a per-user MSIX (rejected by Sysprep), so use the signed standalone release binary pinned by SHA256.
+$ohMyPosh = @{
+    Url    = 'https://github.com/JanDeDobbeleer/oh-my-posh/releases/download/v31.9.1/posh-windows-amd64.exe'
+    Sha256 = 'C2B34D2E8D9DB243172170CE4ADB70B0BD1476D29D355BC783CFA886724EB27E'
+}
 
 ## MarkView is not in Chocolatey; the vendor MSI (ALLUSERS=1) is pinned by version and SHA256.
 $markView = @{
@@ -65,18 +70,40 @@ $logonCommand = "`"$markViewExe`" `"C:\labs\LabGuideExample.md`""
 if ($logonCommand.Length -gt 260) { throw 'The logon command exceeds the 260 character Run key limit.' }
 Set-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'MsftLabsGuide' -Value $logonCommand
 
-## Oh My Posh font (elevated installs are system-wide) and the all-users PowerShell 7 profile
-$posh = (Get-Command -Name oh-my-posh.exe -ErrorAction Stop).Source
-& $posh font install meslo
+## Oh My Posh binary on the machine PATH
+$poshDirectory = Join-Path $env:ProgramFiles 'oh-my-posh\bin'
+New-Item -ItemType Directory -Path $poshDirectory -Force | Out-Null
+$posh = Join-Path $poshDirectory 'oh-my-posh.exe'
+Invoke-WebRequest -Uri $ohMyPosh.Url -OutFile $posh -UseBasicParsing
+$hash = (Get-FileHash -LiteralPath $posh -Algorithm SHA256).Hash
+if ($hash -ne $ohMyPosh.Sha256) { throw "Oh My Posh hash mismatch: expected $($ohMyPosh.Sha256), got $hash." }
+if ((Get-AuthenticodeSignature -LiteralPath $posh).Status -ne 'Valid') { throw 'Oh My Posh signature is not valid.' }
+$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+if (($machinePath -split ';') -notcontains $poshDirectory) { [Environment]::SetEnvironmentVariable('Path', "$machinePath;$poshDirectory", 'Machine') }
+$env:Path += ";$poshDirectory"
+
+## The font CLI installs per user even when elevated (checked on a kept build VM), so copy the files to Windows\Fonts and register them in HKLM.
+& $posh font install meslo --plain
 if ($LASTEXITCODE -ne 0) { throw "oh-my-posh font install failed with exit code $LASTEXITCODE." }
 
+$userFontKey = Get-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts'
 $fontKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts'
-$mesloFonts = @((Get-Item -LiteralPath $fontKey).Property | Where-Object { $_ -match '^Meslo.*Nerd Font \(TrueType\)$' })
-if ($mesloFonts.Count -eq 0) { throw 'No Meslo Nerd Font was registered system-wide after oh-my-posh font install.' }
-$preferredFont = $mesloFonts | Where-Object { $_ -match '^MesloLGM Nerd Font \(TrueType\)$' } | Select-Object -First 1
-if (-not $preferredFont) { $preferredFont = $mesloFonts | Sort-Object Length | Select-Object -First 1 }
-$fontFace = $preferredFont -replace ' \(TrueType\)$', ''
+$mesloFonts = @($userFontKey.Property | Where-Object { $_ -match '^Meslo.*\(TrueType\)$' })
+if ($mesloFonts.Count -eq 0) { throw 'oh-my-posh font install registered no Meslo fonts for the build user.' }
+foreach ($name in $mesloFonts) {
+    $source = [string]$userFontKey.GetValue($name)
+    Copy-Item -LiteralPath $source -Destination (Join-Path $env:SystemRoot 'Fonts') -Force
+    Set-ItemProperty -Path $fontKey -Name $name -Value (Split-Path $source -Leaf)
+    Remove-ItemProperty -LiteralPath $userFontKey.PSPath -Name $name
+    Remove-Item -LiteralPath $source -Force
+}
+$preferredFont = $mesloFonts | Where-Object { $_ -match '^MesloLGM Nerd Font Regular \(TrueType\)$|^MesloLGM Nerd Font \(TrueType\)$' } | Select-Object -First 1
+if (-not $preferredFont) { $preferredFont = $mesloFonts | Where-Object { $_ -notmatch 'Mono|Propo|Bold|Italic' } | Sort-Object Length | Select-Object -First 1 }
+if (-not $preferredFont) { throw 'No regular Meslo Nerd Font was found to use in Windows Terminal.' }
+$fontFace = $preferredFont -replace ' (Regular )?\(TrueType\)$', ''
 Write-Output "Windows Terminal font face: $fontFace"
+
+## All-users PowerShell 7 profile that starts Oh My Posh
 
 $pwsh = (Get-Command -Name pwsh.exe -ErrorAction Stop).Source
 $allUsersProfile = (& $pwsh -NoProfile -Command '$PROFILE.AllUsersAllHosts' | Out-String).Trim()

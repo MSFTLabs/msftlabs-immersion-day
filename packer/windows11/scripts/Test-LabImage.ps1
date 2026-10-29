@@ -30,7 +30,7 @@ foreach ($check in $checks) {
     Write-Output "$($check.Name): $(($result -split "`r?`n")[0])"
 }
 
-$userAppx = @(Get-AppxPackage -AllUsers | Where-Object { $_.Name -in @('Microsoft.PowerShell', 'JanDeDobbeleer.OhMyPosh', 'Microsoft.AzureCLI') })
+$userAppx = @(Get-AppxPackage -AllUsers | Where-Object { $_.Name -in @('Microsoft.PowerShell', 'JanDeDobbeleer.OhMyPosh', 'ohmyposh.cli', 'Microsoft.AzureCLI') })
 if ($userAppx.Count -gt 0) { throw "Per-user Appx packages found that would break Sysprep: $($userAppx.Name -join ', ')" }
 
 $markViewKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{095AE493-66FA-4620-87E7-F76F3F79DBE0}'

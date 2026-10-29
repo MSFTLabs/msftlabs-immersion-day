@@ -150,7 +150,6 @@ build {
   name    = "msftlabs-windows11"
   sources = ["source.azure-arm.windows11"]
 
-  # Applications are installed with Chocolatey (machine-wide) as the packer user; the WinGet CLI is not supported for SYSTEM or unregistered users.
   provisioner "powershell" {
     script  = "${path.root}/scripts/Install-LabTools.ps1"
     timeout = "45m"
