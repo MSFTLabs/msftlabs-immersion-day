@@ -136,15 +136,15 @@ try {
     $personalize = 'HKU\LabDefault\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
     $desktop = 'HKU\LabDefault\Control Panel\Desktop'
     $settings = @(
-        @($personalize, 'AppsUseLightTheme', 'REG_DWORD', '0')
-        @($personalize, 'SystemUsesLightTheme', 'REG_DWORD', '0')
-        @($desktop, 'Wallpaper', 'REG_SZ', $wallpaper)
-        @($desktop, 'WallpaperStyle', 'REG_SZ', '10')
-        @($desktop, 'TileWallpaper', 'REG_SZ', '0')
+        @{ Key = $personalize; Name = 'AppsUseLightTheme'; Type = 'REG_DWORD'; Value = '0' }
+        @{ Key = $personalize; Name = 'SystemUsesLightTheme'; Type = 'REG_DWORD'; Value = '0' }
+        @{ Key = $desktop; Name = 'Wallpaper'; Type = 'REG_SZ'; Value = $wallpaper }
+        @{ Key = $desktop; Name = 'WallpaperStyle'; Type = 'REG_SZ'; Value = '10' }
+        @{ Key = $desktop; Name = 'TileWallpaper'; Type = 'REG_SZ'; Value = '0' }
     )
     foreach ($setting in $settings) {
-        & reg.exe add $setting[0] /v $setting[1] /t $setting[2] /d $setting[3] /f | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "reg add failed for $($setting[1]) (exit code $LASTEXITCODE)." }
+        & reg.exe add $setting.Key /v $setting.Name /t $setting.Type /d $setting.Value /f | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "reg add failed for $($setting.Name) (exit code $LASTEXITCODE)." }
     }
 }
 finally {
