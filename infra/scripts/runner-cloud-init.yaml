@@ -1,0 +1,67 @@
+#cloud-config
+# Installs the build toolchain; the runner is registered later by the setup script's Runner stage.
+package_update: true
+package_upgrade: false
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - jq
+  - unzip
+  - apt-transport-https
+  - lsb-release
+  - software-properties-common
+
+write_files:
+  - path: /opt/runner-bootstrap.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euxo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      CODENAME=$(lsb_release -cs)
+      install -d -m 0755 /etc/apt/keyrings
+
+      # Azure CLI
+      curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+      echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $CODENAME main" > /etc/apt/sources.list.d/azure-cli.list
+      # PowerShell
+      curl -fsSL https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb
+      dpkg -i /tmp/packages-microsoft-prod.deb
+      # Packer
+      curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $CODENAME main" > /etc/apt/sources.list.d/hashicorp.list
+      # GitHub CLI
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli.gpg
+      echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
+      # OpenTofu
+      curl -fsSL https://get.opentofu.org/opentofu.gpg -o /etc/apt/keyrings/opentofu.gpg
+      curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey | gpg --dearmor -o /etc/apt/keyrings/opentofu-repo.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" > /etc/apt/sources.list.d/opentofu.list
+
+      apt-get update
+      apt-get install -y azure-cli powershell packer gh tofu
+
+      # GitHub Actions runner binaries (latest stable); registration happens later.
+      RUNNER_VERSION=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+      install -d -m 0755 -o ${admin_username} -g ${admin_username} /opt/actions-runner
+      curl -fsSL -o /tmp/actions-runner.tar.gz "https://github.com/actions/runner/releases/download/v$${RUNNER_VERSION}/actions-runner-linux-x64-$${RUNNER_VERSION}.tar.gz"
+      tar -xzf /tmp/actions-runner.tar.gz -C /opt/actions-runner
+      chown -R ${admin_username}:${admin_username} /opt/actions-runner
+      /opt/actions-runner/bin/installdependencies.sh
+
+      # Marker + inventory the deployment validates against.
+      {
+        echo "azure-cli: $(az --version | head -n1)"
+        echo "opentofu: $(tofu version | head -n1)"
+        echo "packer: $(packer version)"
+        echo "git: $(git --version)"
+        echo "gh: $(gh --version | head -n1)"
+        echo "pwsh: $(pwsh --version)"
+        echo "runner: $RUNNER_VERSION"
+      } > /opt/runner-tools.txt
+      touch /opt/runner-bootstrap.done
+
+runcmd:
+  - [bash, -c, "/opt/runner-bootstrap.sh > /var/log/runner-bootstrap.log 2>&1 || echo FAILED > /opt/runner-bootstrap.failed"]

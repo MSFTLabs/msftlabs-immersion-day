@@ -1,0 +1,101 @@
+name: Build lab image
+
+# Builds the Windows 11 multi-session image on the self-hosted runner inside the lab VNet.
+# A change to packer/CHANGELOG.md on main starts a build of the version in its first "## [x.y.z]" heading; an existing gallery version is skipped.
+# Variables are set by `./scripts/Setup-LabEnvironment.ps1 -Stage Runner`. Authentication uses the runner VM's managed identity.
+on:
+  push:
+    branches: [main]
+    paths:
+      - packer/CHANGELOG.md
+  workflow_dispatch:
+    inputs:
+      image_version:
+        description: Gallery image version (Major.Minor.Patch); empty uses packer/CHANGELOG.md
+        required: false
+        default: ''
+        type: string
+      image_sku:
+        description: Windows 11 multi-session marketplace SKU
+        required: false
+        default: win11-26h2-avd
+        type: string
+      on_error:
+        description: Packer behavior when the build fails (abort keeps the temporary VM for troubleshooting)
+        required: false
+        default: abort
+        type: choice
+        options:
+          - abort
+          - cleanup
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-lab-image
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, msftlabs-image]
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sign in with the runner's managed identity
+        run: |
+          az login --identity --output none
+          az account set --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+
+      - name: Resolve image version
+        id: image
+        env:
+          INPUT_VERSION: ${{ inputs.image_version }}
+          INPUT_SKU: ${{ inputs.image_sku }}
+        run: |
+          version="${INPUT_VERSION:-$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' packer/CHANGELOG.md | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')}"
+          if [ -z "$version" ]; then
+            echo "No version found in packer/CHANGELOG.md" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sku=${INPUT_SKU:-win11-26h2-avd}" >> "$GITHUB_OUTPUT"
+          if az sig image-version show --resource-group "${{ vars.GALLERY_RESOURCE_GROUP }}" --gallery-name "${{ vars.GALLERY_NAME }}" --gallery-image-definition "${{ vars.IMAGE_DEFINITION_NAME }}" --gallery-image-version "$version" --output none 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Image version $version already exists in the gallery; skipping the build."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write Packer variables
+        if: steps.image.outputs.exists != 'true'
+        env:
+          IMAGE_VERSION: ${{ steps.image.outputs.version }}
+          IMAGE_SKU: ${{ steps.image.outputs.sku }}
+        run: |
+          jq -n \
+            --arg subscription_id "${{ vars.AZURE_SUBSCRIPTION_ID }}" \
+            --arg tenant_id "${{ vars.AZURE_TENANT_ID }}" \
+            --arg location "${{ vars.AZURE_LOCATION }}" \
+            --arg gallery_resource_group "${{ vars.GALLERY_RESOURCE_GROUP }}" \
+            --arg gallery_name "${{ vars.GALLERY_NAME }}" \
+            --arg image_definition_name "${{ vars.IMAGE_DEFINITION_NAME }}" \
+            --arg image_version "$IMAGE_VERSION" \
+            --arg image_sku "$IMAGE_SKU" \
+            --arg virtual_network_name "${{ vars.VNET_NAME }}" \
+            --arg virtual_network_resource_group_name "${{ vars.VNET_RESOURCE_GROUP }}" \
+            --arg virtual_network_subnet_name "${{ vars.VNET_SUBNET_NAME }}" \
+            --argjson replication_regions '${{ vars.REPLICATION_REGIONS }}' \
+            --argjson tags '${{ vars.RESOURCE_TAGS }}' \
+            '$ARGS.named' > build.pkrvars.json
+
+      - name: Packer init and validate
+        if: steps.image.outputs.exists != 'true'
+        run: |
+          packer init packer/windows11
+          packer validate -var-file=build.pkrvars.json packer/windows11
+
+      - name: Packer build
+        if: steps.image.outputs.exists != 'true'
+        run: packer build -on-error=${{ inputs.on_error || 'abort' }} -color=false -var-file=build.pkrvars.json packer/windows11

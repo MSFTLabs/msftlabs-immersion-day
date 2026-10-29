@@ -1,0 +1,53 @@
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'
+$registrationToken = '${registration_token}'
+
+$joinStatus = (& dsregcmd.exe /status | Out-String)
+if ($LASTEXITCODE -ne 0 -or $joinStatus -notmatch 'AzureAdJoined\s*:\s*YES') {
+    throw 'Entra join must complete before AVD agent registration.'
+}
+
+$agentKey = 'HKLM:\SOFTWARE\Microsoft\RDInfraAgent'
+if (Test-Path $agentKey) {
+    $agentProperties = Get-ItemProperty -Path $agentKey
+    $registered = $agentProperties.PSObject.Properties['IsRegistered']
+    if ($null -ne $registered -and $registered.Value -eq 1) {
+        Write-Output 'The AVD agent is already registered; keeping the existing registration.'
+        exit 0
+    }
+}
+
+$downloadDirectory = Join-Path $env:TEMP ('msftlabs-avd-' + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
+
+try {
+    $packages = @(
+        @{ Name = 'AVD Agent'; Uri = 'https://go.microsoft.com/fwlink/?linkid=2310011'; File = 'agent.msi'; Properties = "REGISTRATIONTOKEN=$registrationToken" }
+        @{ Name = 'AVD Bootloader'; Uri = 'https://go.microsoft.com/fwlink/?linkid=2311028'; File = 'bootloader.msi'; Properties = '' }
+    )
+    foreach ($package in $packages) {
+        $installerPath = Join-Path $downloadDirectory $package.File
+        Invoke-WebRequest -Uri $package.Uri -UseBasicParsing -OutFile $installerPath
+        $signature = Get-AuthenticodeSignature -FilePath $installerPath
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+            throw "Publisher signature validation failed for $($package.Name)."
+        }
+        $process = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/i `"$installerPath`" /qn /norestart $($package.Properties)" -PassThru
+        if (-not $process.WaitForExit(900000)) {
+            throw "$($package.Name) installation exceeded 15 minutes."
+        }
+        if ($process.ExitCode -notin @(0, 3010)) {
+            throw "$($package.Name) installation failed with exit code $($process.ExitCode)."
+        }
+        Write-Output "$($package.Name) installation completed."
+    }
+    Start-Service -Name 'RDAgentBootLoader'
+    Write-Output 'AVD components installed. Verify the session host becomes Available in the host pool.'
+    & shutdown.exe /r /t 60 /f /c 'Restart after AVD session-host agent installation.'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not schedule the post-installation restart.' }
+} finally {
+    $registrationToken = $null
+    Remove-Item -Path $downloadDirectory -Recurse -Force -ErrorAction SilentlyContinue
+}
