@@ -1,0 +1,33 @@
+{
+  // Tooling for the Packer image build and the OpenTofu root; nothing from the host profile (az login, ssh keys) is mounted.
+  // Packer's Windows build VM has only a private IP, so a build from this container needs a network path to that VNet.
+  "name": "msftlabs-immersion-day",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "PACKER_VERSION": "1.16.1",
+      "TOFU_VERSION": "1.13.1"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/powershell:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=msftlabs-azure-config,target=/home/vscode/.azure,type=volume",
+    "source=msftlabs-packer-config,target=/home/vscode/.config/packer,type=volume"
+  ],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "hashicorp.hcl",
+        "opentofu.vscode-opentofu",
+        "ms-vscode.powershell",
+        "github.vscode-github-actions"
+      ]
+    }
+  }
+}
