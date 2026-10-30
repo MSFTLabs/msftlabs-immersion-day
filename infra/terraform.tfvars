@@ -13,7 +13,7 @@ tags = {
 // Image Gallery Configs
 gallery_name          = "msftlabs_cus_immersionday_gallery"
 image_definition_name = "win11-immersionday-lab"
-replication_regions   = ["CentralUS", "WestUS3", "WestUS2"]
+replication_regions   = []
 gallary_sharing       = "Private"
 image_ostype          = "Windows"
 image_description     = "Windows 11 Enterprise multi-session with immersion-day lab tools."

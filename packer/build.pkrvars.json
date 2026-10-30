@@ -1,0 +1,18 @@
+{
+  "subscription_id": "934600ac-0f19-44b8-b439-b4c5f02d8a7d",
+  "tenant_id": "477bacc4-4ada-4431-940b-b91cf6cb3fd4",
+  "location": "CentralUS",
+  "gallery_resource_group": "msftlabs-cus-immersionday",
+  "gallery_name": "msftlabs_cus_immersionday_gallery",
+  "image_definition_name": "win11-immersionday-lab",
+  "image_version": "0.0.1",
+  "image_sku": "win11-26h2-avd",
+  "virtual_network_name": "",
+  "virtual_network_resource_group_name": "",
+  "virtual_network_subnet_name": "",
+  "replication_regions": [],
+  "tags": {
+    "Environment": "Labs",
+    "Project": "msftlabs-immersion-day"
+  }
+}

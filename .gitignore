@@ -7,8 +7,6 @@
 **/*.tfplan
 **/*.plan
 **/*.auto.tfvars.json
-**/*.pkrvars.hcl
-**/*.pkrvars.json
 **/crash.log
 .tools/
 artifacts/
