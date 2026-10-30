@@ -83,6 +83,11 @@ variable "virtual_network_subnet_name" {
   type = string
 }
 
+variable "allowed_inbound_ip_addresses" {
+  type    = list(string)
+  default = []
+}
+
 locals {
   target_regions = distinct(concat([var.location], var.replication_regions))
 }
@@ -115,6 +120,9 @@ source "azure-arm" "windows11" {
   virtual_network_name                = var.virtual_network_name
   virtual_network_resource_group_name = var.virtual_network_resource_group_name
   virtual_network_subnet_name         = var.virtual_network_subnet_name
+
+  # Only used for public-IP builds (no VNet values); an empty list leaves the temporary NSG rule open to any source.
+  allowed_inbound_ip_addresses = var.allowed_inbound_ip_addresses
 
   # WinRM over HTTP 5985. The plugin's default Key Vault + HTTPS certificate is skipped; WinRM is enabled by a script that
   # runs on the VM at provisioning time (plugin example windows_skip_key_vault).
