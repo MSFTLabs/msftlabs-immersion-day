@@ -38,12 +38,12 @@ resource "azurerm_storage_account" "boot_diagnostics" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/log_analytics_workspace
 resource "azurerm_log_analytics_workspace" "lab" {
-  name                            = var.monitoring_config.workspace_name
+  name                            = local.monitoring_workspace_name
   resource_group_name             = azurerm_resource_group.shared.name
   location                        = azurerm_resource_group.shared.location
   sku                             = local.monitoring_workspace_sku
-  retention_in_days               = var.monitoring_config.workspace_retention_days
-  daily_quota_gb                  = var.monitoring_config.workspace_daily_quota_gb
+  retention_in_days               = local.monitoring_workspace_retention_days
+  daily_quota_gb                  = local.monitoring_workspace_daily_quota_gb
   local_authentication_enabled    = local.monitoring_workspace_local_authentication
   allow_resource_only_permissions = local.monitoring_workspace_resource_only_permissions
   internet_ingestion_access_type  = local.monitoring_public_network_access
@@ -85,14 +85,14 @@ resource "azurerm_monitor_diagnostic_setting" "shared" {
 // Image Gallery Resources
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/shared_image_gallery
 resource "azurerm_shared_image_gallery" "lab" {
-  name                = var.gallery_name
+  name                = local.gallery_name
   resource_group_name = azurerm_resource_group.shared.name
   location            = azurerm_resource_group.shared.location
-  description         = var.image_description
+  description         = local.image_description
   tags                = local.tags
 
   dynamic "sharing" {
-    for_each = var.gallary_sharing == "Private" ? [] : [var.gallary_sharing]
+    for_each = local.gallery_sharing == "Private" ? [] : [local.gallery_sharing]
     content {
       permission = sharing.value
     }
@@ -101,22 +101,22 @@ resource "azurerm_shared_image_gallery" "lab" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/shared_image
 resource "azurerm_shared_image" "windows11" {
-  name                   = var.image_definition_name
+  name                   = local.image_definition_name
   gallery_name           = azurerm_shared_image_gallery.lab.name
   resource_group_name    = azurerm_resource_group.shared.name
   location               = azurerm_resource_group.shared.location
-  os_type                = var.image_ostype
+  os_type                = local.image_os_type
   architecture           = local.image_architecture
   hyper_v_generation     = local.image_generation
   specialized            = local.image_specialized
   trusted_launch_enabled = local.image_trusted_launch_enabled
-  description            = var.image_description
+  description            = local.image_description
   tags                   = local.tags
 
   identifier {
-    publisher = var.image_identifier.publisher
-    offer     = var.image_identifier.offer
-    sku       = var.image_identifier.sku
+    publisher = local.image_identifier.publisher
+    offer     = local.image_identifier.offer
+    sku       = local.image_identifier.sku
   }
 }
 

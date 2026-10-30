@@ -10,19 +10,6 @@ tags = {
 }
 
 
-// Image Gallery Configs
-gallery_name          = "msftlabs_cus_immersionday_gallery"
-image_definition_name = "win11-immersionday-lab"
-replication_regions   = []
-gallary_sharing       = "Private"
-image_ostype          = "Windows"
-image_description     = "Windows 11 Enterprise multi-session with immersion-day lab tools."
-image_identifier = {
-  publisher = "MSFTLABS"
-  offer     = "ImmersionDay"
-  sku       = "Windows11EnterpriseMultiSession"
-}
-
 // Network Configs
 network_config = {
   name                    = "vnet-msftlabs-cus-immersionday"
@@ -34,35 +21,8 @@ network_config = {
   bastion_subnet_cidr     = "10.42.0.0/26"
 }
 
-bastion_config = {
-  name              = "msftlabs-cus-immersionday-bastion"
-  sku               = "Standard"
-  tunneling_enabled = true
-}
-
-// Self-hosted GitHub runner (also hosts Packer image builds inside the VNet)
-runner_config = {
-  name              = "msftlabs-runner"
-  size              = "Standard_D2s_v5"
-  admin_username    = "runneradmin"
-  github_repository = "MSFTLabs/msftlabs-immersion-day"
-}
-
 // Lab User Configs
 num_of_labusers = 5
-
-// Lab Credential Vault Configs
-key_vault_config = {
-  name_prefix         = "kv-msftlabs-cus"
-  staff_principal_ids = []
-}
-
-monitoring_config = {
-  boot_storage_name_prefix = "stmsftcusboot"
-  workspace_name           = "law-msftlabs-cus-immersionday"
-  workspace_retention_days = 30
-  workspace_daily_quota_gb = -1
-}
 
 // AVD Configs
 avd_config = {

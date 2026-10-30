@@ -1,18 +1,3 @@
-variable "gallery_name" {
-  type        = string
-  description = "Compute gallery name, unique within the subscription; no hyphens."
-
-  validation {
-    condition     = can(regex("^[A-Za-z][A-Za-z0-9_.]{0,79}$", var.gallery_name))
-    error_message = "Use 1-80 characters, starting with a letter, containing letters, digits, underscores or periods."
-  }
-}
-
-variable "image_definition_name" {
-  type        = string
-  description = "Image definition receiving the Packer-managed image versions."
-}
-
 variable "location" {
   type        = string
   description = "Azure region code for the gallery and build VM, such as eastus2."
@@ -26,11 +11,6 @@ variable "owner" {
     condition     = length(trimspace(var.owner)) > 0
     error_message = "An Owner tag value is required."
   }
-}
-
-variable "replication_regions" {
-  type        = list(string)
-  description = "Additional lab regions; the gallery/build region is always included."
 }
 
 variable "resource_group_name" {
@@ -61,44 +41,6 @@ variable "tenant_id" {
     condition     = can(regex("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$", var.tenant_id))
     error_message = "Supply the target Microsoft Entra tenant GUID."
   }
-}
-
-variable "gallary_sharing" {
-  type        = string
-  description = "Sharing permission for the gallery, such as 'Private', 'Groups' or 'Community'."
-
-  validation {
-    condition     = contains(["Private", "Groups", "Community"], var.gallary_sharing)
-    error_message = "gallary_sharing must be either 'Private', 'Groups' or 'Community'."
-  }
-}
-
-variable "image_ostype" {
-  type        = string
-  description = "Operating system type for the lab image, such as Windows or Linux."
-  validation {
-    condition     = contains(["Windows", "Linux"], var.image_ostype)
-    error_message = "image_ostype must be either 'Windows' or 'Linux'."
-  }
-}
-
-variable "image_description" {
-  type        = string
-  description = "Description for the lab image."
-
-  validation {
-    condition     = length(trimspace(var.image_description)) > 0
-    error_message = "An image description is required."
-  }
-}
-
-variable "image_identifier" {
-  type = object({
-    publisher = string
-    offer     = string
-    sku       = string
-  })
-  description = "Identifier for the lab image, including publisher, offer, and SKU."
 }
 
 variable "network_config" {
@@ -137,35 +79,6 @@ variable "network_config" {
       for pair in setproduct([var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr], [var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr]) : pair[0] == pair[1] || (!cidrcontains(pair[0], cidrhost(pair[1], 0)) && !cidrcontains(pair[1], cidrhost(pair[0], 0)))
     ]) && length(toset([var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr])) == 3, false)
     error_message = "AVD, image-build and Bastion subnet ranges must be distinct and non-overlapping."
-  }
-}
-
-variable "runner_config" {
-  type = object({
-    name              = string
-    size              = string
-    admin_username    = string
-    github_repository = string
-  })
-  description = "Self-hosted GitHub Actions runner VM placed in the image_build subnet; Packer builds run from it over private networking."
-
-  validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{1,13}[a-z0-9]$", var.runner_config.name)) && can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.runner_config.github_repository))
-    error_message = "Use a 3-15 character lowercase runner name and an owner/repository GitHub repository."
-  }
-}
-
-variable "bastion_config" {
-  type = object({
-    name              = string
-    sku               = string
-    tunneling_enabled = bool
-  })
-  description = "Public Bastion configuration; AzureBastionSubnet has no NSG."
-
-  validation {
-    condition     = contains(["Basic", "Standard"], var.bastion_config.sku) && (!var.bastion_config.tunneling_enabled || var.bastion_config.sku == "Standard")
-    error_message = "Use Basic or Standard; native-client tunneling requires Standard."
   }
 }
 
@@ -245,54 +158,3 @@ variable "num_of_labusers" {
     error_message = "num_of_labusers must be an integer from 0 to 999."
   }
 }
-
-variable "monitoring_config" {
-  type = object({
-    boot_storage_name_prefix = string
-    workspace_name           = string
-    workspace_retention_days = number
-    workspace_daily_quota_gb = number
-  })
-  description = "Boot-diagnostics storage naming and shared Log Analytics workspace configuration; fixed collection/security settings remain in locals."
-
-  validation {
-    condition     = can(regex("^[a-z0-9]{1,16}$", var.monitoring_config.boot_storage_name_prefix))
-    error_message = "Use 1-16 lowercase letters/digits for the boot storage prefix; an eight-character unique suffix is appended."
-  }
-
-  validation {
-    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9-]{2,61}[A-Za-z0-9]$", var.monitoring_config.workspace_name))
-    error_message = "Use 4-63 letters/digits/hyphens for the workspace name, without a leading or trailing hyphen."
-  }
-
-  validation {
-    condition     = var.monitoring_config.workspace_retention_days >= 30 && var.monitoring_config.workspace_retention_days <= 730 && var.monitoring_config.workspace_retention_days == floor(var.monitoring_config.workspace_retention_days)
-    error_message = "Workspace retention must be an integer from 30 to 730 days."
-  }
-
-  validation {
-    condition     = var.monitoring_config.workspace_daily_quota_gb == -1 || var.monitoring_config.workspace_daily_quota_gb > 0
-    error_message = "Use -1 for uncapped ingestion or a positive daily quota in GB; a reached cap interrupts log collection."
-  }
-}
-
-variable "key_vault_config" {
-  type = object({
-    name_prefix         = string
-    staff_principal_ids = set(string)
-  })
-  description = "Credential-vault name prefix and approved staff Entra object IDs with secret-read access; fixed security settings remain in locals."
-
-  validation {
-    condition     = can(regex("^[A-Za-z][A-Za-z0-9-]{0,14}$", var.key_vault_config.name_prefix)) && !endswith(var.key_vault_config.name_prefix, "-") && !strcontains(var.key_vault_config.name_prefix, "--")
-    error_message = "Use a 1-15 character vault prefix starting with a letter, without trailing or consecutive hyphens; a unique suffix is derived in locals."
-  }
-
-  validation {
-    condition     = alltrue([for principal in var.key_vault_config.staff_principal_ids : can(regex("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$", principal))])
-    error_message = "Staff principals must be Entra user/group/service-principal object GUIDs, not names or client IDs."
-  }
-}
-
-
-

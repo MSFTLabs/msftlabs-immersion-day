@@ -7,7 +7,7 @@ resource "azurerm_role_assignment" "lab_credentials_writer" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/role_assignment
 resource "azurerm_role_assignment" "lab_credentials_staff" {
-  for_each = var.key_vault_config.staff_principal_ids
+  for_each = local.key_vault_staff_principal_ids
 
   scope                = azurerm_key_vault.lab_credentials.id
   role_definition_name = local.lab_key_vault_reader_role

@@ -39,7 +39,7 @@ output "packer_configuration" {
     gallery_resource_group              = azurerm_resource_group.shared.name
     gallery_name                        = azurerm_shared_image_gallery.lab.name
     image_definition_name               = azurerm_shared_image.windows11.name
-    replication_regions                 = distinct(concat([var.location], var.replication_regions))
+    replication_regions                 = distinct(concat([var.location], local.replication_regions))
     tags                                = local.tags
     virtual_network_name                = azurerm_virtual_network.lab.name
     virtual_network_resource_group_name = azurerm_resource_group.shared.name
@@ -55,9 +55,9 @@ output "runner_configuration" {
     resource_group_name  = azurerm_resource_group.shared.name
     private_ip_address   = azurerm_network_interface.runner.private_ip_address
     principal_id         = azurerm_linux_virtual_machine.runner.identity[0].principal_id
-    admin_username       = var.runner_config.admin_username
+    admin_username       = local.runner_admin_username
     admin_password_vault = "${azurerm_key_vault.lab_credentials.vault_uri}secrets/${local.runner_secret_name}"
-    github_repository    = var.runner_config.github_repository
+    github_repository    = local.runner_github_repository
     labels               = local.runner_labels
   }
 }

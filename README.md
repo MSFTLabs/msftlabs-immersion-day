@@ -2,6 +2,8 @@
 
 Deploy from GitHub Codespaces or a local VS Code Dev Container using Bash or PowerShell 7. Run commands from the repository root. Deployment and image builds incur Azure charges.
 
+Open Lab Desktops: [client.wvd.microsoft.com/arm/webclient/index.html](https://client.wvd.microsoft.com/arm/webclient/index.html.)
+
 ## Local Environment
 
 1. In GitHub, select **Code > Codespaces > Create codespace**, or open the cloned repository in VS Code and select **Dev Containers: Reopen in Container** (requires Docker and the Dev Containers extension).

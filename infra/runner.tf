@@ -24,7 +24,7 @@ resource "azurerm_key_vault_secret" "runner_admin_password" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/network_interface
 resource "azurerm_network_interface" "runner" {
-  name                = "${var.runner_config.name}-nic"
+  name                = "${local.runner_name}-nic"
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
   tags                = local.tags
@@ -38,13 +38,13 @@ resource "azurerm_network_interface" "runner" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/linux_virtual_machine
 resource "azurerm_linux_virtual_machine" "runner" {
-  name                            = var.runner_config.name
-  computer_name                   = var.runner_config.name
+  name                            = local.runner_name
+  computer_name                   = local.runner_name
   location                        = azurerm_resource_group.shared.location
   resource_group_name             = azurerm_resource_group.shared.name
-  size                            = var.runner_config.size
+  size                            = local.runner_size
   network_interface_ids           = [azurerm_network_interface.runner.id]
-  admin_username                  = var.runner_config.admin_username
+  admin_username                  = local.runner_admin_username
   admin_password                  = random_password.runner.result
   disable_password_authentication = false
   secure_boot_enabled             = local.runner_secure_boot_enabled
@@ -61,7 +61,7 @@ resource "azurerm_linux_virtual_machine" "runner" {
   }
 
   os_disk {
-    name                 = "${var.runner_config.name}-osdisk"
+    name                 = "${local.runner_name}-osdisk"
     caching              = local.runner_os_disk_caching
     storage_account_type = local.runner_os_disk_type
     disk_size_gb         = local.runner_os_disk_size_gb

@@ -6,13 +6,45 @@ locals {
     Owner           = var.owner
   })
 
+  // Image Gallery Configurations
+  gallery_name          = "msftlabs_cus_immersionday_gallery"
+  image_definition_name = "win11-immersionday-lab"
+  replication_regions   = []
+  gallery_sharing       = "Private"
+  image_os_type         = "Windows"
+  image_description     = "Windows 11 Enterprise multi-session with immersion-day lab tools."
+  image_identifier = {
+    publisher = "MSFTLABS"
+    offer     = "ImmersionDay"
+    sku       = "Windows11EnterpriseMultiSession"
+  }
+
+  // Bastion Configurations
+  bastion_name              = "msftlabs-cus-immersionday-bastion"
+  bastion_sku               = "Standard"
+  bastion_tunneling_enabled = true
+
+  // Runner Identity (also hosts Packer image builds inside the VNet)
+  runner_name              = "msftlabs-runner"
+  runner_size              = "Standard_D2s_v5"
+  runner_admin_username    = "runneradmin"
+  runner_github_repository = "MSFTLabs/msftlabs-immersion-day"
+
   // Image Settings that shouldn't be changed without review.
   image_architecture           = "x64"
   image_generation             = "V2"
   image_specialized            = false
   image_trusted_launch_enabled = true
 
-  boot_diagnostics_storage_name                  = "${var.monitoring_config.boot_storage_name_prefix}${substr(sha256("${var.tenant_id}:${var.subscription_id}:${var.resource_group_name}:boot"), 0, 8)}"
+  key_vault_name_prefix         = "kv-msftlabs-cus"
+  key_vault_staff_principal_ids = toset([])
+
+  monitoring_boot_storage_name_prefix = "stmsftcusboot"
+  monitoring_workspace_name           = "law-msftlabs-cus-immersionday"
+  monitoring_workspace_retention_days = 30
+  monitoring_workspace_daily_quota_gb = -1
+
+  boot_diagnostics_storage_name                  = "${local.monitoring_boot_storage_name_prefix}${substr(sha256("${var.tenant_id}:${var.subscription_id}:${var.resource_group_name}:boot"), 0, 8)}"
   boot_diagnostics_storage_kind                  = "StorageV2"
   boot_diagnostics_storage_tier                  = "Standard"
   boot_diagnostics_storage_replication           = "LRS"
@@ -119,7 +151,7 @@ locals {
   runner_secure_boot_enabled   = true
   runner_vtpm_enabled          = true
   runner_cloud_init = templatefile("${path.module}/scripts/runner-cloud-init.yaml", {
-    admin_username = var.runner_config.admin_username
+    admin_username = local.runner_admin_username
   })
 
   // AVD Configurations
@@ -246,7 +278,7 @@ locals {
     }
   ])
 
-  lab_key_vault_name                       = "${lower(var.key_vault_config.name_prefix)}-${substr(sha256("${var.tenant_id}:${var.subscription_id}:${var.resource_group_name}"), 0, 8)}"
+  lab_key_vault_name                       = "${lower(local.key_vault_name_prefix)}-${substr(sha256("${var.tenant_id}:${var.subscription_id}:${var.resource_group_name}"), 0, 8)}"
   lab_key_vault_sku                        = "standard"
   lab_key_vault_rbac_enabled               = true
   lab_key_vault_public_network_access      = true

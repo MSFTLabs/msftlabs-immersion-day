@@ -67,7 +67,7 @@ resource "azurerm_subnet_network_security_group_association" "lab" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/public_ip
 resource "azurerm_public_ip" "bastion" {
-  name                = "${var.bastion_config.name}-pip"
+  name                = "${local.bastion_name}-pip"
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
   allocation_method   = local.public_ip_allocation_method
@@ -82,11 +82,11 @@ resource "azurerm_public_ip" "bastion" {
 
 // https://search.opentofu.org/provider/hashicorp/azurerm/latest/docs/resources/bastion_host
 resource "azurerm_bastion_host" "lab" {
-  name                = var.bastion_config.name
+  name                = local.bastion_name
   location            = azurerm_resource_group.shared.location
   resource_group_name = azurerm_resource_group.shared.name
-  sku                 = var.bastion_config.sku
-  tunneling_enabled   = var.bastion_config.tunneling_enabled
+  sku                 = local.bastion_sku
+  tunneling_enabled   = local.bastion_tunneling_enabled
   tags                = local.tags
 
   ip_configuration {
