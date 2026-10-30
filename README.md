@@ -166,7 +166,29 @@ A positive `num_of_labusers` makes the `azuread` and `msgraph` providers call Mi
 | `Policy.ReadWrite.AuthenticationMethod` | Enable TAP for the lab group (`msgraph_resource_action`) |
 | `UserAuthenticationMethod.ReadWrite.All` | Issue TAPs (credential publisher) |
 
-Grant the permissions to the existing `ARM_CLIENT_ID` service principal and give admin consent. The role IDs below are the Microsoft Graph application role IDs in the public cloud; confirm them with `az ad sp show --id 00000003-0000-0000-c000-000000000000 --query "appRoles[].{value:value,id:id}"` if consent fails.
+Create the service principal first if one does not exist (`./scripts/Setup-LabEnvironment.ps1 -Stage ServicePrincipal` does the same interactively). Run this as yourself with `az login`, as Global Administrator or Privileged Role Administrator plus Application Administrator, and Owner (or Contributor plus User Access Administrator) on the subscription. It creates a single-tenant app registration, its service principal and a one-year client secret, and sets the `ARM_*` variables for this session only so the snippets below work unchanged. The secret is never printed; persist it only where you intend to.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+
+$TenantId = '<tenant-guid>'
+$SubscriptionId = '<subscription-guid>'
+$AppName = 'sp-msftlabs-immersion-day'
+
+az account set --subscription $SubscriptionId
+
+$AppId = az ad app create --display-name $AppName --sign-in-audience AzureADMyOrg --query appId --output tsv
+$SpObjectId = az ad sp create --id $AppId --query id --output tsv
+$Secret = az ad app credential reset --id $AppId --append --display-name "lab-setup-$(Get-Date -Format 'yyyyMMdd')" --years 1 --query password --output tsv
+
+$env:ARM_CLIENT_ID = $AppId
+$env:ARM_CLIENT_SECRET = $Secret
+$env:ARM_TENANT_ID = $TenantId
+$env:ARM_SUBSCRIPTION_ID = $SubscriptionId
+```
+
+Grant the permissions to the service principal (`$env:ARM_CLIENT_ID`) and give admin consent. The role IDs below are the Microsoft Graph application role IDs in the public cloud; confirm them with `az ad sp show --id 00000003-0000-0000-c000-000000000000 --query "appRoles[].{value:value,id:id}"` if consent fails.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -201,6 +223,17 @@ The credential publisher gets its Graph token from `az account get-access-token`
 ```powershell
 az login --service-principal --username $env:ARM_CLIENT_ID --password $env:ARM_CLIENT_SECRET --tenant $env:ARM_TENANT_ID
 az account set --subscription $env:ARM_SUBSCRIPTION_ID
+```
+
+To run OpenTofu and Packer from GitHub Codespaces, or to give the Actions workflows the same identity, store the four values as repository secrets. Each value is piped in so nothing is echoed. Anyone with write access who can open a Codespace on the repository can read Codespaces secrets, so scope this to a lab repository. The dev container signs Azure CLI in as this service principal when the `ARM_*` secrets exist (the image workflow itself uses the runner's managed identity).
+
+```powershell
+$Repo = '<owner>/<repo>'
+foreach ($App in 'actions', 'codespaces') {
+    foreach ($Name in 'ARM_CLIENT_ID', 'ARM_CLIENT_SECRET', 'ARM_TENANT_ID', 'ARM_SUBSCRIPTION_ID') {
+        [Environment]::GetEnvironmentVariable($Name, 'Process') | gh secret set $Name --app $App --repo $Repo
+    }
+}
 ```
 
 These permissions let the service principal create and modify users, groups and authentication methods across the tenant. Use a dedicated lab tenant or subscription, protect the client secret, and revoke the consent after the event by deleting the Graph app-role assignments, then removing the requested permissions.
