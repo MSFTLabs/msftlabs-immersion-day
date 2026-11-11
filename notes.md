@@ -9,7 +9,7 @@ Scenario:
 Additional Talking Points/Topics:
 
 - TAGS - Constantly reenforce the importance of tagging!
-- ALZ - talk about how this would look in typical Azure LazazafndingZone.
+- ALZ - talk about how this would look in typical Azure LandingZone.
 - Policy - Talk about Azure Policy
 
 Lab Setup Reqs:
@@ -31,12 +31,12 @@ Lab Setup Reqs:
 
 Topics:
 
-- LAB01: Introduction to Azure Networking - Level 100
+- LAB01: Introduction to Azure Networking - Level 100 || Henry
 
   - Time: ~1hr (not including lecture)
   - Description: Learn about Azure Networking by walking through deploying VNET, Azure Bastion, and NSGs || A level 200/300 version of this could include Secure vWAN Hubs + Azure Firewall and routing
   - Workshop Guides:
-    - Create Virtual Networksasd
+    - Create Virtual Networks
     - Create Three Subnets
       - BastionSubnet (Explain what Bastion Service is)
       - Subnet1
@@ -45,8 +45,8 @@ Topics:
       - subnet1-nsg | Lock them down
       - subnet2-nsg | Lock them down
     - Deploy Azure Bastion Service (so we can talk about how to protect\secure your access to VMs)
-    - Create Keyvault for SSH Keys needed for Ubuntu VM (bastion can native reference KV.) using SAMI (Bastion and VM)
-- LAB02: Introduction to Azure Storage Accounts - Level 100
+    - RBAC/IAM -> What permissions/Azure Roles are suited for Networking Teams
+- LAB02: Introduction to Azure Storage Accounts - Level 100 || Henry
 
   - Time: ~30m (not including lecture)
   - Description: Learn about deploy azure Storage Accounts. Cover topics like Sku, Resilency, LCM, Blob vs File, Managed Disks, Immutability/Versioning. || Level 200/300 version of this lab should cover Private Endpoints and securing Storage Accounts.
@@ -55,11 +55,13 @@ Topics:
     - Upload Images/Static content (container2)
     - Private using SAMI
     - Public Endpoint Enabled (talk about private endpoints)
-- LAB03: Introduction to Azure Virtual Machines - Level 100
+    - RBAC/IAM -> What permissions/Azure Roles are suited for Storage
+- LAB03: Introduction to Azure Virtual Machines - Level 100 || Ben
 
   - Time: ~1hr (not including lecture)
   - Description: Learn about deploying Azure Virtual Machines from the marketplace. Will cover sizing, skus, families, monitoring, availability zones, extensions (automation) and availability sets. || A level 200/300 version of Application Gateway vs ELB for this. || Need to find available SKU and Region -> Pre check region/sku availability prior to event.
   - Workshop Guides:
+  - Create Keyvault for SSH Keys needed for Ubuntu VM (bastion can native reference KV.) using SAMI (Bastion and VM)
     - Create External Load-Balancer + PIP (explain how this impact outbound egress and why you should NEVER put a PIP on a VM.. ) on subnet1
     - Create Ubuntu VM1 on Subnet2 using DSE to install nginx (or any other webserver) and configure simple Status Page (HTML) -> This will give a chance to explain VM Extensions (when/why use them).
       - Configure CSE to point to bash script on Storage Account
@@ -68,7 +70,8 @@ Topics:
     - Configure Load balancer to point to 80 on VM1
     - Validate Page from http://<PIP></pip>
     - Open NSG for INTERNET <-> TCP/HTTP 80 on Subnet2 - explain more about this..
-- LAB04: Monitoring and Observability in the Cloud - Level 100
+    - RBAC/IAM -> What permissions/Azure Roles are suited for Virtual Machines
+- LAB04: Monitoring and Observability in the Cloud - Level 100 || Ben
 
   - Time: ~2hr (not inlcuding lecture)
   - Description: This will include building dashboard using Grafana for Azure Monitor Dashboards and working with Azure SRE Agent
@@ -80,3 +83,4 @@ Topics:
     - Build Azure Dashboard and Azure Monitor Grafana Dashboard | talk about the differences..
     - Build out Alerts/Groups
     - Demonstrate Azure SRE Agent
+    - RBAC/IAM -> What permissions/Azure Roles are suited for Monitoring and Security Teams
