@@ -31,15 +31,16 @@ avd_config = {
   application_group_name    = "dag-msftlabs-cus-immersionday"
   desktop_display_name      = "Immersion Day Lab Desktop"
   session_host_name_prefix  = "lab-avd"
-  session_host_size         = "Standard_D2s_v5"
+  session_host_size         = "Standard_D8s_v5"
   session_host_os_disk_type = "StandardSSD_LRS"
   maximum_sessions_per_host = 8
   load_balancer_type        = "BreadthFirst"
   admin_username            = "labadmin"
 }
 
+// Make sure these are updated before running!!
 avd_session_host_count      = 2
 avd_image_version           = "1.0.3"
 avd_admin_password          = null
-avd_registration_expiration = "2026-11-05T02:33:26Z"
+avd_registration_expiration = "2026-12-05T00:00:00Z"
 

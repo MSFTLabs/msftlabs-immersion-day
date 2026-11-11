@@ -69,14 +69,14 @@ variable "network_config" {
 
   validation {
     condition = try(alltrue([
-      for subnet in [var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr] : cidrcontains(var.network_config.address_space, cidrhost(subnet, 0)) && cidrcontains(var.network_config.address_space, cidrhost(subnet, -1))
+      for subnet in [var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr] : tonumber(split("/", subnet)[1]) >= tonumber(split("/", var.network_config.address_space)[1]) && cidrhost("${split("/", subnet)[0]}/${split("/", var.network_config.address_space)[1]}", 0) == cidrhost(var.network_config.address_space, 0)
     ]), false)
     error_message = "All subnets must fit within the VNet address space."
   }
 
   validation {
     condition = try(alltrue([
-      for pair in setproduct([var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr], [var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr]) : pair[0] == pair[1] || (!cidrcontains(pair[0], cidrhost(pair[1], 0)) && !cidrcontains(pair[1], cidrhost(pair[0], 0)))
+      for pair in setproduct([var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr], [var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr]) : pair[0] == pair[1] || cidrhost("${split("/", pair[0])[0]}/${min(tonumber(split("/", pair[0])[1]), tonumber(split("/", pair[1])[1]))}", 0) != cidrhost("${split("/", pair[1])[0]}/${min(tonumber(split("/", pair[0])[1]), tonumber(split("/", pair[1])[1]))}", 0)
     ]) && length(toset([var.network_config.avd_subnet_cidr, var.network_config.image_build_subnet_cidr, var.network_config.bastion_subnet_cidr])) == 3, false)
     error_message = "AVD, image-build and Bastion subnet ranges must be distinct and non-overlapping."
   }
