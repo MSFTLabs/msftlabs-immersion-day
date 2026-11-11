@@ -38,8 +38,9 @@ avd_config = {
   admin_username            = "labadmin"
 }
 
+// Make sure these are updated before running!!
 avd_session_host_count      = 2
 avd_image_version           = "1.0.3"
 avd_admin_password          = null
-avd_registration_expiration = "2026-11-05T02:33:26Z"
+avd_registration_expiration = "2026-12-05T00:00:00Z"
 

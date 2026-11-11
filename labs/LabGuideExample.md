@@ -39,15 +39,15 @@ https://portal.azure.com
 - [ ] For **Resource group**, select the existing group named after your lab user (for example `LAB-LabUser001`). Do not create a new one.
 - [ ] Under **Instance details**, enter the values below.
 
-| Field | Value |
-| --- | --- |
-| Virtual machine name | `myVM` |
-| Region | `(US) Central US` |
-| Availability options | No infrastructure redundancy required |
-| Security type | Trusted launch virtual machines |
-| Image | `Windows Server 2022 Datacenter: Azure Edition - x64 Gen2` |
-| VM architecture | x64 |
-| Size | `Standard_B2ms` |
+| Field                | Value                                                        |
+| -------------------- | ------------------------------------------------------------ |
+| Virtual machine name | `myVM`                                                     |
+| Region               | `(US) Central US`                                          |
+| Availability options | No infrastructure redundancy required                        |
+| Security type        | Trusted launch virtual machines                              |
+| Image                | `Windows Server 2022 Datacenter: Azure Edition - x64 Gen2` |
+| VM architecture      | x64                                                          |
+| Size                 | `Standard_B2ms`                                            |
 
 Copy the VM name:
 
