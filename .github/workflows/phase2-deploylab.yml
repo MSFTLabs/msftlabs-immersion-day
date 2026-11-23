@@ -3,7 +3,7 @@ name: Deploy lab (AVD hosts, lab users and TAPs)
 # Manual only: run it from the Actions tab after Deploy Packer prerequisites and Build lab image have succeeded.
 # Runs the Phase 2 OpenTofu apply as the pre-staged service principal: AVD session hosts from a gallery image version, the Entra lab users and group, the Temporary Access Pass (TAP) policy, and one TAP per user stored in the lab Key Vault.
 # The service principal needs seven Microsoft Graph roles and cannot grant them to itself. A Global Administrator runs .github/scripts/Grant-LabGraphPermissions.ps1 once; the first step here checks them.
-# The credentials file the apply writes stays on the runner and is deleted: this repository is public, so it is never uploaded as an artifact.
+# The credentials CSV is stored alongside state in Azure Storage, then deleted from the runner; it is never uploaded as a GitHub artifact.
 on:
   workflow_dispatch:
     inputs:
@@ -156,6 +156,7 @@ jobs:
             echo "STATE_STORAGE_ACCOUNT=stlab$hash"
             echo "STATE_CONTAINER=infra"
             echo "STATE_KEY=prereq/$deployment_name.tfstate"
+            echo "CREDENTIALS_BLOB=credentials/$deployment_name/LabUsers.csv"
           } >> "$GITHUB_ENV"
           echo "State: $deployment_name-state / stlab$hash / infra / prereq/$deployment_name.tfstate"
 
@@ -259,6 +260,44 @@ jobs:
             -var="tenant_id=$ARM_TENANT_ID" \
             -var="runner_github_repository=$GITHUB_REPOSITORY" \
             labphase2.plan
+
+      - name: Store the staff credentials CSV with the state
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $csvPath = & tofu -chdir=infra output -raw lab_users_csv_path
+          $vault = (& tofu -chdir=infra output -json lab_credentials_key_vault | Out-String) | ConvertFrom-Json -AsHashtable
+
+          # A no-change apply does not rerun the CSV provisioner, so export the retained vault records.
+          $rows = @(
+            foreach ($secretId in ($vault.secret_ids.Values | Sort-Object)) {
+              $record = (& az keyvault secret show --id $secretId --query value --output tsv --only-show-errors | Out-String) | ConvertFrom-Json
+              [pscustomobject]@{
+                LabUser = $record.LabUser
+                Password = $record.Password
+                TAP = $record.TAP
+              }
+            }
+          )
+          try {
+            $env:LAB_CREDENTIALS_JSON = ConvertTo-Json -InputObject $rows -Depth 8
+            & ./infra/scripts/Export-LabUserCsv.ps1 -Path $csvPath
+          } finally {
+            $env:LAB_CREDENTIALS_JSON = $null
+          }
+
+          & az storage blob upload --account-name $env:STATE_STORAGE_ACCOUNT --container-name $env:STATE_CONTAINER --name $env:CREDENTIALS_BLOB --file $csvPath --auth-mode login --overwrite true --only-show-errors --output none
+          @(
+            '## Staff credentials CSV saved'
+            ''
+            ('Storage account: `{0}`; container: `{1}`; blob: `{2}`.' -f $env:STATE_STORAGE_ACCOUNT, $env:STATE_CONTAINER, $env:CREDENTIALS_BLOB)
+            ''
+            'Download after signing in with Azure CLI:'
+            '```powershell'
+            ('az storage blob download --account-name "{0}" --container-name "{1}" --name "{2}" --file LabUsers.csv --auth-mode login --overwrite true --output none' -f $env:STATE_STORAGE_ACCOUNT, $env:STATE_CONTAINER, $env:CREDENTIALS_BLOB)
+            '```'
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Verify the hosts, the TAPs and the stored credentials
         shell: bash

@@ -33,6 +33,18 @@ Recovering the runner also requires reconciling `random_password.runner` with th
 
 The prerequisite workflow refuses to run against state containing lab users or session hosts because its zero-count overrides would delete them. Use the setup script's Phase2 stage with the intended counts for a populated lab.
 
+### Download lab-user credentials
+
+After the prerequisites and image build, run [Deploy lab (AVD hosts, lab users and TAPs)](.github/workflows/phase2-deploylab.yml). After a successful apply, it saves `LabUsers.csv` in the same storage account and `infra` container as the OpenTofu state, at `credentials/<deploymentName>/LabUsers.csv`. The workflow re-exports the retained Key Vault records even on a no-change apply, without renewing TAPs, and overwrites that blob with the current CSV.
+
+The workflow run summary includes the storage location and a ready-to-use download command. After `az login`, download locally with an identity that has blob read access:
+
+```powershell
+az storage blob download --account-name '<state-storage-account>' --container-name infra --name 'credentials/<deploymentName>/LabUsers.csv' --file .\LabUsers.csv --auth-mode login --overwrite true --output none
+```
+
+The CSV contains plaintext initial passwords and TAPs. It is not uploaded as a GitHub artifact; the runner's local copy is still deleted during cleanup. Key Vault remains the source of the credential records.
+
 ## Local Environment
 
 1. In GitHub, select **Code > Codespaces > Create codespace**, or open the cloned repository in VS Code and select **Dev Containers: Reopen in Container** (requires Docker and the Dev Containers extension).
